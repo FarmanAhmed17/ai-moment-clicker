@@ -56,9 +56,13 @@ class MomentDetectorBridge(private val context: Context) : MethodChannel.MethodC
                 try {
                     startDetection(requested)
                     result.success(true)
-                } catch (error: Exception) {
+                } catch (error: Throwable) {
+                    // Loading a MediaPipe task can fail with an Error (a missing
+                    // libmediapipe_tasks_vision_jni.so for the device ABI throws
+                    // UnsatisfiedLinkError), which must not take the app down.
                     Log.e(TAG, "Unable to start detection", error)
-                    result.error("start_failed", error.message, null)
+                    stopDetection()
+                    result.error("start_failed", describe(error), null)
                 }
             }
 
@@ -142,7 +146,7 @@ class MomentDetectorBridge(private val context: Context) : MethodChannel.MethodC
                     bitmap.recycle()
                     emit(currentAction, detection)
                 }
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 Log.e(TAG, "Frame analysis failed", error)
             } finally {
                 busy.set(false)
@@ -174,6 +178,9 @@ class MomentDetectorBridge(private val context: Context) : MethodChannel.MethodC
             )
         }
     }
+
+    private fun describe(error: Throwable): String =
+        error.message ?: error::class.java.simpleName
 
     private fun assetPath(asset: String): String =
         FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)

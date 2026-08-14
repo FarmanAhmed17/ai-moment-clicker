@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'dart:async';
 import 'dart:io';
@@ -112,7 +113,22 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _toggleAutoCapture(bool enabled) async {
     if (enabled) {
       await _initializeControllerFuture;
-      await _detector.start(_selectedAction);
+      try {
+        await _detector.start(_selectedAction);
+      } on PlatformException catch (error) {
+        // Detection is unavailable on this device (for example MediaPipe has no
+        // native library for its ABI); stay in manual mode instead of pretending
+        // the camera is watching.
+        if (!mounted) return;
+        setState(() {
+          _autoCaptureEnabled = false;
+          _promptError = "Detection unavailable: ${error.message}";
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Detection unavailable: ${error.message}")),
+        );
+        return;
+      }
       _detectionSubscription ??= _detector.detections.listen((detection) {
         if (mounted) setState(() => _lastDetection = detection);
       });
@@ -161,10 +177,9 @@ class _CameraScreenState extends State<CameraScreen> {
     });
 
     if (_autoCaptureEnabled) {
-      await _detector.start(action);
-    } else {
-      await _toggleAutoCapture(true);
+      await _toggleAutoCapture(false);
     }
+    await _toggleAutoCapture(true);
   }
 
   Future<void> _startStream() async {
@@ -213,6 +228,24 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  /// The shutter doubles as the monitoring control: while a moment is being
+  /// watched for only the detector may fire [_capture].
+  String get _primaryButtonLabel {
+    if (_autoCaptureEnabled) return "STOP WATCHING (${_selectedAction.label})";
+    if (_promptPreview != null) return "START WATCHING (${_promptPreview!.label})";
+    return "CLICK MOMENT 📸";
+  }
+
+  Future<void> _onPrimaryButtonPressed() async {
+    if (_autoCaptureEnabled) {
+      await _toggleAutoCapture(false);
+    } else if (_promptController.text.trim().isNotEmpty) {
+      await _applyPrompt(_promptController.text);
+    } else {
+      await _capture();
+    }
+  }
+
   Widget _buildControls() {
     final detection = _lastDetection;
     return Padding(
@@ -231,7 +264,7 @@ class _CameraScreenState extends State<CameraScreen> {
               errorText: _promptError,
               helperText: _promptPreview == null
                   ? null
-                  : "Tap ▶ to watch for ${_promptPreview!.label}",
+                  : "Will watch for ${_promptPreview!.label}",
               suffixIcon: IconButton(
                 icon: const Icon(Icons.play_arrow),
                 tooltip: "Watch for this moment",
@@ -300,8 +333,8 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: CameraPreview(_controller),
                 ),
                 ElevatedButton(
-                  onPressed: () => _capture(),
-                  child: const Text("CLICK MOMENT 📸"),
+                  onPressed: _onPrimaryButtonPressed,
+                  child: Text(_primaryButtonLabel),
                 ),
               ],
             );
