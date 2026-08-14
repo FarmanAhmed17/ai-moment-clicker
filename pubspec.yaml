@@ -61,6 +61,7 @@ flutter:
   assets:
   - assets/models/gesture_recognizer.task
   - assets/models/face_landmarker.task
+  - assets/models/pose_landmarker_lite.task
 
   # To add assets to your application, add an assets section, like this:
   # assets:

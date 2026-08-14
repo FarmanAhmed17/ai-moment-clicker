@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'dart:async';
 import 'dart:io';
 import 'package:gal/gal.dart';
+import 'ai/moment_action.dart';
+import 'ai/moment_detector.dart';
 late List<CameraDescription> cameras;
 
 Future<void> main() async {
@@ -63,25 +66,165 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  late final CameraDescription _camera;
 
   final TextEditingController _promptController = TextEditingController();
+  late final MomentDetector _detector;
+  StreamSubscription<MomentDetection>? _detectionSubscription;
+
+  MomentAction _selectedAction = MomentAction.thumbsUp;
+  MomentDetection? _lastDetection;
+  bool _autoCaptureEnabled = false;
+  bool _streaming = false;
+  bool _capturing = false;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = CameraController(
-      cameras[0],
-      ResolutionPreset.medium,
+    _camera = cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => cameras[0],
     );
 
+    _controller = CameraController(
+      _camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+
+    _detector = MomentDetector(onMomentConfirmed: _onMomentConfirmed);
     _initializeControllerFuture = _controller.initialize();
   }
 
   @override
   void dispose() {
+    _detectionSubscription?.cancel();
+    _detector.dispose();
     _controller.dispose();
+    _promptController.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleAutoCapture(bool enabled) async {
+    if (enabled) {
+      await _initializeControllerFuture;
+      await _detector.start(_selectedAction);
+      _detectionSubscription ??= _detector.detections.listen((detection) {
+        if (mounted) setState(() => _lastDetection = detection);
+      });
+      await _startStream();
+    } else {
+      await _stopStream();
+      await _detector.stop();
+    }
+    if (!mounted) return;
+    setState(() {
+      _autoCaptureEnabled = enabled;
+      _lastDetection = null;
+    });
+  }
+
+  Future<void> _startStream() async {
+    if (_streaming) return;
+    _streaming = true;
+    await _controller.startImageStream((image) {
+      if (_capturing) return;
+      _detector.processCameraImage(
+        image,
+        rotationDegrees: _camera.sensorOrientation,
+        mirrored: _camera.lensDirection == CameraLensDirection.front,
+      );
+    });
+  }
+
+  Future<void> _stopStream() async {
+    if (!_streaming) return;
+    _streaming = false;
+    await _controller.stopImageStream();
+  }
+
+  void _onMomentConfirmed(MomentDetection detection) {
+    _capture(automatic: true);
+  }
+
+  Future<void> _capture({bool automatic = false}) async {
+    if (_capturing) return;
+    _capturing = true;
+    try {
+      // The image stream and takePicture cannot run at the same time, so the
+      // stream pauses for the shot and resumes when the preview is dismissed.
+      await _stopStream();
+      final image = await _controller.takePicture();
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PreviewScreen(image: image),
+        ),
+      );
+    } finally {
+      _capturing = false;
+      if (mounted && _autoCaptureEnabled) {
+        await _startStream();
+      }
+    }
+  }
+
+  Widget _buildControls() {
+    final detection = _lastDetection;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _promptController,
+            decoration: const InputDecoration(
+              hintText: "Describe the moment...",
+              border: OutlineInputBorder(),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButton<MomentAction>(
+                  isExpanded: true,
+                  value: _selectedAction,
+                  items: [
+                    for (final action in MomentAction.values)
+                      DropdownMenuItem(value: action, child: Text(action.label)),
+                  ],
+                  onChanged: (action) async {
+                    if (action == null) return;
+                    setState(() {
+                      _selectedAction = action;
+                      _lastDetection = null;
+                    });
+                    if (_autoCaptureEnabled) await _detector.start(action);
+                  },
+                ),
+              ),
+              Switch(
+                value: _autoCaptureEnabled,
+                onChanged: (enabled) => _toggleAutoCapture(enabled),
+              ),
+              const Text("Auto"),
+            ],
+          ),
+          if (_autoCaptureEnabled)
+            Text(
+              detection == null
+                  ? "Watching for ${_selectedAction.label}..."
+                  : "${detection.state}: ${detection.detected} "
+                      "(${(detection.score * 100).toStringAsFixed(0)}%)",
+              style: TextStyle(
+                color: detection?.detected == true ? Colors.green : Colors.grey,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -95,31 +238,17 @@ class _CameraScreenState extends State<CameraScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             return Column(
-  children: [
-    TextField(
-      controller: _promptController,
-      decoration: const InputDecoration(
-        hintText: "Describe the moment...",
-        border: OutlineInputBorder(),
-      ),
-    ),
-    Expanded(
-      child: CameraPreview(_controller),
-    ),ElevatedButton(
-  onPressed: () async {
-  final image = await _controller.takePicture();
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => PreviewScreen(image: image),
-    ),
-  );
-},
-  child: const Text("CLICK MOMENT 📸"),
-),
-  ],
-);
+              children: [
+                _buildControls(),
+                Expanded(
+                  child: CameraPreview(_controller),
+                ),
+                ElevatedButton(
+                  onPressed: () => _capture(),
+                  child: const Text("CLICK MOMENT 📸"),
+                ),
+              ],
+            );
           } else {
             return const Center(
               child: CircularProgressIndicator(),

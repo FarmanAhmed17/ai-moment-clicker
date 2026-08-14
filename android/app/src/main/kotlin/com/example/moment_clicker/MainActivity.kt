@@ -1,37 +1,22 @@
 package com.example.moment_clicker
 
-import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
-import io.flutter.plugin.common.MethodChannel
+import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterActivity() {
 
-    private val CHANNEL = "moment_clicker_ai"
+    private var detectorBridge: MomentDetectorBridge? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        MethodChannel(
-            flutterEngine!!.dartExecutor.binaryMessenger,
-            CHANNEL
-        ).setMethodCallHandler { call, result ->
-
-            when (call.method) {
-
-                "startGestureDetection" -> {
-                    // yaha gesture recognizer start hoga
-                    result.success("Gesture detection started")
-                }
-
-                "startFaceDetection" -> {
-                    // yaha face landmarker start hoga
-                    result.success("Face detection started")
-                }
-
-                else -> {
-                    result.notImplemented()
-                }
-            }
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        detectorBridge = MomentDetectorBridge(applicationContext).also {
+            it.register(flutterEngine.dartExecutor.binaryMessenger)
         }
+    }
+
+    override fun onDestroy() {
+        detectorBridge?.dispose()
+        detectorBridge = null
+        super.onDestroy()
     }
 }
