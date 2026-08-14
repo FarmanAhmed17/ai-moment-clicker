@@ -3,6 +3,10 @@
 Flutter camera app that clicks the shutter by itself when it sees the moment you picked:
 thumbs up, hands spread, hand wave, smile or jump.
 
+Type an instruction such as "take a picture when I give a thumbs up" and submit it, or pick the
+moment from the dropdown. A prompt that does not name exactly one supported moment is reported
+back and leaves detection off.
+
 ## How auto capture works
 
 The camera screen streams frames over the `moment_clicker_ai` method channel to the Android side,

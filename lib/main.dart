@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:gal/gal.dart';
 import 'ai/moment_action.dart';
 import 'ai/moment_detector.dart';
+import 'ai/prompt_parser.dart';
 late List<CameraDescription> cameras;
 
 Future<void> main() async {
@@ -74,6 +75,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   MomentAction _selectedAction = MomentAction.thumbsUp;
   MomentDetection? _lastDetection;
+  String? _promptError;
   bool _autoCaptureEnabled = false;
   bool _streaming = false;
   bool _capturing = false;
@@ -123,6 +125,33 @@ class _CameraScreenState extends State<CameraScreen> {
       _autoCaptureEnabled = enabled;
       _lastDetection = null;
     });
+  }
+
+  /// Turns the typed instruction into the moment to watch for and arms auto
+  /// capture. An instruction that does not map to exactly one moment leaves the
+  /// detector untouched and only reports back to the user.
+  Future<void> _applyPrompt(String prompt) async {
+    final interpretation = interpretPrompt(prompt);
+    if (!interpretation.isResolved) {
+      setState(() => _promptError = interpretation.message);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(interpretation.message)),
+      );
+      return;
+    }
+
+    final action = interpretation.action!;
+    setState(() {
+      _promptError = null;
+      _selectedAction = action;
+      _lastDetection = null;
+    });
+
+    if (_autoCaptureEnabled) {
+      await _detector.start(action);
+    } else {
+      await _toggleAutoCapture(true);
+    }
   }
 
   Future<void> _startStream() async {
@@ -180,9 +209,17 @@ class _CameraScreenState extends State<CameraScreen> {
         children: [
           TextField(
             controller: _promptController,
-            decoration: const InputDecoration(
-              hintText: "Describe the moment...",
-              border: OutlineInputBorder(),
+            textInputAction: TextInputAction.done,
+            onSubmitted: _applyPrompt,
+            decoration: InputDecoration(
+              hintText: "Take a picture when I give a thumbs up",
+              border: const OutlineInputBorder(),
+              errorText: _promptError,
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.play_arrow),
+                tooltip: "Watch for this moment",
+                onPressed: () => _applyPrompt(_promptController.text),
+              ),
             ),
           ),
           Row(
@@ -200,6 +237,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     setState(() {
                       _selectedAction = action;
                       _lastDetection = null;
+                      _promptError = null;
                     });
                     if (_autoCaptureEnabled) await _detector.start(action);
                   },
