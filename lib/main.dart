@@ -76,6 +76,7 @@ class _CameraScreenState extends State<CameraScreen> {
   MomentAction _selectedAction = MomentAction.thumbsUp;
   MomentDetection? _lastDetection;
   String? _promptError;
+  MomentAction? _promptPreview;
   bool _autoCaptureEnabled = false;
   bool _streaming = false;
   bool _capturing = false;
@@ -127,6 +128,17 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
+  /// Live feedback while typing, so it is obvious whether the instruction is
+  /// understood before it is submitted.
+  void _previewPrompt(String prompt) {
+    final preview = interpretPrompt(prompt).action;
+    if (preview == _promptPreview && _promptError == null) return;
+    setState(() {
+      _promptPreview = preview;
+      _promptError = null;
+    });
+  }
+
   /// Turns the typed instruction into the moment to watch for and arms auto
   /// capture. An instruction that does not map to exactly one moment leaves the
   /// detector untouched and only reports back to the user.
@@ -143,6 +155,7 @@ class _CameraScreenState extends State<CameraScreen> {
     final action = interpretation.action!;
     setState(() {
       _promptError = null;
+      _promptPreview = null;
       _selectedAction = action;
       _lastDetection = null;
     });
@@ -211,10 +224,14 @@ class _CameraScreenState extends State<CameraScreen> {
             controller: _promptController,
             textInputAction: TextInputAction.done,
             onSubmitted: _applyPrompt,
+            onChanged: _previewPrompt,
             decoration: InputDecoration(
               hintText: "Take a picture when I give a thumbs up",
               border: const OutlineInputBorder(),
               errorText: _promptError,
+              helperText: _promptPreview == null
+                  ? null
+                  : "Tap ▶ to watch for ${_promptPreview!.label}",
               suffixIcon: IconButton(
                 icon: const Icon(Icons.play_arrow),
                 tooltip: "Watch for this moment",
@@ -238,6 +255,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       _selectedAction = action;
                       _lastDetection = null;
                       _promptError = null;
+                      _promptPreview = null;
                     });
                     if (_autoCaptureEnabled) await _detector.start(action);
                   },
