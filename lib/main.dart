@@ -231,8 +231,9 @@ class _CameraScreenState extends State<CameraScreen> {
   /// The shutter doubles as the monitoring control: while a moment is being
   /// watched for only the detector may fire [_capture].
   String get _primaryButtonLabel {
-    if (_autoCaptureEnabled) return "STOP WATCHING (${_selectedAction.label})";
-    if (_promptPreview != null) return "START WATCHING (${_promptPreview!.label})";
+    if (_autoCaptureEnabled) {
+      return "WATCHING FOR ${_selectedAction.label} — TAP TO STOP";
+    }
     return "CLICK MOMENT 📸";
   }
 
@@ -264,7 +265,7 @@ class _CameraScreenState extends State<CameraScreen> {
               errorText: _promptError,
               helperText: _promptPreview == null
                   ? null
-                  : "Will watch for ${_promptPreview!.label}",
+                  : "Tap CLICK MOMENT to watch for ${_promptPreview!.label}",
               suffixIcon: IconButton(
                 icon: const Icon(Icons.play_arrow),
                 tooltip: "Watch for this moment",
