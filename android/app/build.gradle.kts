@@ -25,6 +25,11 @@ android {
         versionName = flutter.versionName
     }
 
+    androidResources {
+        // MediaPipe memory maps the models straight out of the APK.
+        noCompress += listOf("task", "tflite")
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
