@@ -46,7 +46,7 @@ class HomePage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "MOMENT CLICKER BY FARMAN",
+              "M😊MENT CLICKER BY FARMAN",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 22,
