@@ -42,8 +42,21 @@ class HomePage extends StatelessWidget {
         title: const Text("Moment Clicker"),
       ),
       body: Center(
-        child: ElevatedButton(
-          onPressed: () {
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "MOMENT CLICKER BY FARMAN",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
   Navigator.push(
     context,
     MaterialPageRoute(
