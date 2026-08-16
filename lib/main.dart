@@ -349,7 +349,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: CameraPreview(_controller),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 32),
+                  padding: const EdgeInsets.only(bottom: 56),
                   child: ElevatedButton(
                     onPressed: _onPrimaryButtonPressed,
                     child: Text(_primaryButtonLabel),
