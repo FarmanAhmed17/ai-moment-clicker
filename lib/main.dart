@@ -57,14 +57,16 @@ class HomePage extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => CameraScreen(),
-    ),
-  );
-},
-          child: const Text("Capture Moment 📸"),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CameraScreen(),
+                  ),
+                );
+              },
+              child: const Text("Capture Moment 📸"),
+            ),
+          ],
         ),
       ),
     );
